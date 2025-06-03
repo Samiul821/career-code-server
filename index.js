@@ -35,7 +35,7 @@ async function run() {
       const email = req.query.email;
       const query = {};
       if (email) {
-        query.hr_email = email
+        query.hr_email = email;
       }
 
       const cursor = jobsCollection.find(query);
@@ -47,14 +47,14 @@ async function run() {
     // app.get("/jobsByEmailAddress", async (req, res) => {
     //   const email = req.query.email;
     //   const query = { hr_email: email };
-    //   const reslut = await jobsCollection.find(query).toArray();
-    //   res.send(reslut);
+    //   const result = await jobsCollection.find(query).toArray();
+    //   res.send(result);
     // });
 
     app.post("/jobs", async (req, res) => {
       const newJob = req.body;
-      const reslut = await jobsCollection.insertOne(newJob);
-      res.send(reslut);
+      const result = await jobsCollection.insertOne(newJob);
+      res.send(result);
     });
 
     app.get("/jobs/:id", async (req, res) => {
@@ -71,9 +71,9 @@ async function run() {
       const query = {
         applicant: email,
       };
-      const reslut = await applicationsCollection.find(query).toArray();
+      const result = await applicationsCollection.find(query).toArray();
       //  bad way to aggregate data
-      for (const application of reslut) {
+      for (const application of result) {
         const jobId = application.jobId;
         const jobQuery = { _id: new ObjectId(jobId) };
         const job = await jobsCollection.findOne(jobQuery);
@@ -82,13 +82,21 @@ async function run() {
         application.company_logo = job.company_logo;
       }
 
-      res.send(reslut);
+      res.send(result);
+    });
+
+    // app.get('/applications/:id',() =>{})
+    app.get("/applications/job/:job_id", async (req, res) => {
+      const job_id = req.params.job_id;
+      const query = { jobId: job_id };
+      const result = await applicationsCollection.find(query).toArray();
+      res.send(result);
     });
 
     app.post("/applications", async (req, res) => {
       const application = req.body;
-      const reslut = await applicationsCollection.insertOne(application);
-      res.send(reslut);
+      const result = await applicationsCollection.insertOne(application);
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection

@@ -32,9 +32,29 @@ async function run() {
 
     // jobs api
     app.get("/jobs", async (req, res) => {
-      const cursor = jobsCollection.find();
+      const email = req.query.email;
+      const query = {};
+      if (email) {
+        query.hr_email = email
+      }
+
+      const cursor = jobsCollection.find(query);
       const result = await cursor.toArray();
       res.send(result);
+    });
+
+    // could be done but should not be done.
+    // app.get("/jobsByEmailAddress", async (req, res) => {
+    //   const email = req.query.email;
+    //   const query = { hr_email: email };
+    //   const reslut = await jobsCollection.find(query).toArray();
+    //   res.send(reslut);
+    // });
+
+    app.post("/jobs", async (req, res) => {
+      const newJob = req.body;
+      const reslut = await jobsCollection.insertOne(newJob);
+      res.send(reslut);
     });
 
     app.get("/jobs/:id", async (req, res) => {
@@ -52,6 +72,16 @@ async function run() {
         applicant: email,
       };
       const reslut = await applicationsCollection.find(query).toArray();
+      //  bad way to aggregate data
+      for (const application of reslut) {
+        const jobId = application.jobId;
+        const jobQuery = { _id: new ObjectId(jobId) };
+        const job = await jobsCollection.findOne(jobQuery);
+        application.company = job.company;
+        application.title = job.title;
+        application.company_logo = job.company_logo;
+      }
+
       res.send(reslut);
     });
 

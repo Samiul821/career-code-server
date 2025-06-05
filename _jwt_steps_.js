@@ -20,6 +20,8 @@
     axios.post("http://localhost:3000/jwt", userData, {
               withCredentials: true
             })
+    or for fecth add option credentials: 'include'
+
     5. in cors setting set Credentials and origin       
     app.use(
       cors({
@@ -34,4 +36,17 @@
         httpOnly:  true,
         secure: false
       })
+
+
+
+      -------------
+      7. use cookieParser as middleware
+      8. for every api you wnat to verify token: in the client side: if using axios withCredentials: true for fetch: credetials include
+  
+      ------------
+    8. check token exists. if not, return 401 --> unauthorized
+    9. jwt.verify function. if err return 401 --> unauthorized
+    10. if token is valid set the decoded value to the req object
+    11. 
+  
  */

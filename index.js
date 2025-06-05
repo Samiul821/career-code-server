@@ -1,13 +1,21 @@
 const express = require("express");
 const cors = require("cors");
 const app = express();
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const port = process.env.PORT || 3000;
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
 // middelware
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.json());
+app.use(cookieParser())
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.9rzwgbq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -29,6 +37,22 @@ async function run() {
     const applicationsCollection = client
       .db("careerCode")
       .collection("applications");
+
+    // jwt token related api
+    app.post("/jwt", async (req, res) => {
+      const userData = req.body;
+      const token = jwt.sign(userData, process.env.JWT_ACCESS_SECRET, {
+        expiresIn: "1d",
+      });
+
+      // set token in the cookies
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: false,
+      });
+
+      res.send({ success: true });
+    });
 
     // jobs api
     app.get("/jobs", async (req, res) => {
@@ -68,6 +92,8 @@ async function run() {
     app.get("/applications", async (req, res) => {
       const email = req.query.email;
 
+      console.log("inside applications api", req.cookies);
+
       const query = {
         applicant: email,
       };
@@ -96,6 +122,19 @@ async function run() {
     app.post("/applications", async (req, res) => {
       const application = req.body;
       const result = await applicationsCollection.insertOne(application);
+      res.send(result);
+    });
+
+    app.patch("/applications/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          status: req.body.status,
+        },
+      };
+
+      const result = await applicationsCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
 

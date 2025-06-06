@@ -4,6 +4,10 @@ const app = express();
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const port = process.env.PORT || 3000;
+
+const admin = require("firebase-admin");
+const serviceAccount = require("./firebase-admin-service-key.json");
+
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
@@ -47,6 +51,29 @@ const client = new MongoClient(uri, {
   },
 });
 
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const verifyFirebaseToken = async (req, res, next) => {
+  const authHeader = req?.headers?.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).send({ message: "unathorized access" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded2 = await admin.auth().verifyIdToken(token);
+    console.log("decoded token2", decoded2);
+    req.decoded2 = decoded2;
+    next();
+  } catch (error) {
+    return res.status(401).send({ message: "unathorized access" });
+  }
+};
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -62,7 +89,7 @@ async function run() {
       const userInfo = req.body;
 
       const token = jwt.sign(userInfo, process.env.JWT_ACCESS_SECRET, {
-        expiresIn: "2h",
+        expiresIn: "2d",
       });
 
       res.cookie("token", token, {
@@ -74,7 +101,7 @@ async function run() {
     });
 
     // jobs api
-    app.get("/jobs", verifyToken, async (req, res) => {
+    app.get("/jobs", async (req, res) => {
       const email = req.query.email;
       const query = {};
       if (email) {
@@ -87,17 +114,32 @@ async function run() {
     });
 
     // could be done but should not be done.
-    // app.get("/jobsByEmailAddress", async (req, res) => {
+    // app.get('/jobsByEmailAddress', async (req, res) => {
     //   const email = req.query.email;
-    //   const query = { hr_email: email };
+    //   const query = { hr_email: email }
     //   const result = await jobsCollection.find(query).toArray();
     //   res.send(result);
-    // });
+    // })
 
-    app.post("/jobs", async (req, res) => {
-      const newJob = req.body;
-      const result = await jobsCollection.insertOne(newJob);
-      res.send(result);
+    app.get("/jobs/applications", verifyFirebaseToken, async (req, res) => {
+      const email = req.query.email;
+
+      if (email !== req.decoded2.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+
+      const query = { hr_email: email };
+      const jobs = await jobsCollection.find(query).toArray();
+
+      // should use aggregate to have optimum data fetching
+      for (const job of jobs) {
+        const applicationQuery = { jobId: job._id.toString() };
+        const application_count = await applicationsCollection.countDocuments(
+          applicationQuery
+        );
+        job.application_count = application_count;
+      }
+      res.send(jobs);
     });
 
     app.get("/jobs/:id", async (req, res) => {
@@ -108,8 +150,12 @@ async function run() {
     });
 
     // job applications reated api
-    app.get("/applications", logger, async (req, res) => {
+    app.get("/applications", verifyFirebaseToken, async (req, res) => {
       const email = req.query.email;
+
+      if (email !== req.decoded2.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
 
       const query = {
         applicant: email,
